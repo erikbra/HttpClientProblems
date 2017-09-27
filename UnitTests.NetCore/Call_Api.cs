@@ -207,7 +207,8 @@ namespace UnitTests
             using (var resp = await httpClient.GetAsync(relativeUri))
             {
                 resp.EnsureSuccessStatusCode();
-                using (var content = resp.Content) { 
+                using (var content = resp.Content)
+                {
                     json = await content.ReadAsStringAsync();
                 }
             }
