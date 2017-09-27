@@ -32,6 +32,7 @@ namespace UnitTests
         public Call_Api(ITestOutputHelper output)
         {
             ServicePointManager.Expect100Continue = false;
+            ServicePointManager.DefaultConnectionLimit = 32;
 
             _output = output;
             
@@ -201,10 +202,15 @@ namespace UnitTests
 
         private async Task<string[]> CallApi(HttpClient httpClient, string relativeUri)
         {
-            var resp = await httpClient.GetAsync(relativeUri);
-            resp.EnsureSuccessStatusCode();
-            HttpContent content = resp.Content;
-            var json = await content.ReadAsStringAsync();
+            string json;
+
+            using (var resp = await httpClient.GetAsync(relativeUri))
+            {
+                resp.EnsureSuccessStatusCode();
+                using (var content = resp.Content) { 
+                    json = await content.ReadAsStringAsync();
+                }
+            }
 
             return JsonConvert.DeserializeObject<string[]>(json);
         }
