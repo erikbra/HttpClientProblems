@@ -31,18 +31,21 @@ namespace UnitTests
 
         public Call_Api(ITestOutputHelper output)
         {
-            ServicePointManager.Expect100Continue = false;
-            ServicePointManager.DefaultConnectionLimit = 32;
-            ServicePointManager.MaxServicePointIdleTime = 60000;
-
             _output = output;
 
-            var messageHandler1 = GetMessageHandler();
-            var messageHandler2 = GetMessageHandler();
+            _secureHttpClient = GetHttpClient(_secureBaseAddress);
+            _httpHttpClient = GetHttpClient(_httpBaseAddress);
+        }
 
-            _secureHttpClient = new HttpClient(messageHandler1) {BaseAddress = _secureBaseAddress};
-            _httpHttpClient = new HttpClient(messageHandler2) {BaseAddress = _httpBaseAddress};
+        private HttpClient GetHttpClient(Uri baseAddress)
+        {
+            var servicePoint = ServicePointManager.FindServicePoint(baseAddress);
+            servicePoint.ConnectionLeaseTimeout = 60 * 1000;
+            servicePoint.ConnectionLimit = 12 * Environment.ProcessorCount;
+            servicePoint.Expect100Continue = true;
+            servicePoint.SetTcpKeepAlive(true, 30000, 10000);
 
+            return new HttpClient(GetMessageHandler()) {BaseAddress = baseAddress};
         }
 
         private static WinHttpHandler GetMessageHandler()
@@ -57,7 +60,7 @@ namespace UnitTests
         [Fact]
         public async Task Fast_Once()
         {
-            var res = await CallApi(_secureHttpClient, FastRelativeUri);
+            var res = await CallApi(_secureHttpClient, FastRelativeUri).ConfigureAwait(false);
 
             res.Length.Should().Be(2);
             res.First().Should().Be("value1");
@@ -67,7 +70,7 @@ namespace UnitTests
         [Fact]
         public async Task Slow_Once()
         {
-            var res = await CallApi(_secureHttpClient, SlowRelativeUri);
+            var res = await CallApi(_secureHttpClient, SlowRelativeUri).ConfigureAwait(false);
 
             res.Length.Should().Be(2);
             res.First().Should().StartWith("value1");
@@ -82,7 +85,7 @@ namespace UnitTests
         [InlineData(10000)]
         public async Task Fast_Multiple_Times_In_A_Row(int numTimes)
         {
-            var res = await CallMultpleTimesInARow(_secureHttpClient, FastRelativeUri, numTimes);
+            var res = await CallMultpleTimesInARow(_secureHttpClient, FastRelativeUri, numTimes).ConfigureAwait(false);
             AssertNoFailedCalls(res);
         }
 
@@ -96,7 +99,7 @@ namespace UnitTests
         [InlineData(10000)]
         public async Task Https_Fast_Multiple_Times_In_Parallel(int numTimes)
         {
-            var res = await CallMultipleTimesInParallel(_secureHttpClient, FastRelativeUri, numTimes);
+            var res = await CallMultipleTimesInParallel(_secureHttpClient, FastRelativeUri, numTimes).ConfigureAwait(false);
             AssertNoFailedCalls(res);
         }
 
@@ -111,7 +114,7 @@ namespace UnitTests
         [InlineData(10000)]
         public async Task Http_Fast_Multiple_Times_In_Parallel(int numTimes)
         {
-            var res = await CallMultipleTimesInParallel(_httpHttpClient, FastRelativeUri, numTimes);
+            var res = await CallMultipleTimesInParallel(_httpHttpClient, FastRelativeUri, numTimes).ConfigureAwait(false);
             AssertNoFailedCalls(res);
         }
 
@@ -123,7 +126,7 @@ namespace UnitTests
         //[InlineData(10000)]
         public async Task Slow_Multiple_Times_In_A_Row(int numTimes)
         {
-            var res = await CallMultpleTimesInARow(_secureHttpClient, SlowRelativeUri, numTimes);
+            var res = await CallMultpleTimesInARow(_secureHttpClient, SlowRelativeUri, numTimes).ConfigureAwait(false);
             AssertNoFailedCalls(res);
         }
 
@@ -138,7 +141,7 @@ namespace UnitTests
         [InlineData(10000)]
         public async Task Slow_Multiple_Times_In_Parallel(int numTimes)
         {
-            var res = await CallMultipleTimesInParallel(_secureHttpClient, SlowRelativeUri, numTimes);
+            var res = await CallMultipleTimesInParallel(_secureHttpClient, SlowRelativeUri, numTimes).ConfigureAwait(false);
             AssertNoFailedCalls(res);
         }
 
@@ -164,7 +167,7 @@ namespace UnitTests
             {
                 tasks.Add(Measure(() => CallApi(httpClient, relativeUri)));
             }
-            var results = await Task.WhenAll(tasks);
+            var results = await Task.WhenAll(tasks).ConfigureAwait(false);
 
             sw.Stop();
 
@@ -183,7 +186,7 @@ namespace UnitTests
             var results = new CallResult[numTimes];
             for (var i = 0; i < numTimes; i++)
             {
-                results[i] = await Measure(() => CallApi(httpClient, relativeUri));
+                results[i] = await Measure(() => CallApi(httpClient, relativeUri)).ConfigureAwait(false);
             }
 
             sw.Stop();
