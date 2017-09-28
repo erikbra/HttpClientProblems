@@ -33,12 +33,25 @@ namespace UnitTests
         {
             ServicePointManager.Expect100Continue = false;
             ServicePointManager.DefaultConnectionLimit = 32;
+            ServicePointManager.MaxServicePointIdleTime = 60000;
 
             _output = output;
-            
-            _secureHttpClient = new HttpClient() {BaseAddress = _secureBaseAddress};
-            _httpHttpClient = new HttpClient() {BaseAddress = _httpBaseAddress};
 
+            var messageHandler1 = GetMessageHandler();
+            var messageHandler2 = GetMessageHandler();
+
+            _secureHttpClient = new HttpClient(messageHandler1) {BaseAddress = _secureBaseAddress};
+            _httpHttpClient = new HttpClient(messageHandler2) {BaseAddress = _httpBaseAddress};
+
+        }
+
+        private static WinHttpHandler GetMessageHandler()
+        {
+            return new WinHttpHandler
+            {
+                MaxConnectionsPerServer = 32,
+                SendTimeout = TimeSpan.FromSeconds(60)
+            };
         }
 
         [Fact]
@@ -204,12 +217,12 @@ namespace UnitTests
         {
             string json;
 
-            using (var resp = await httpClient.GetAsync(relativeUri))
+            using (var resp = await httpClient.GetAsync(relativeUri).ConfigureAwait(false))
             {
                 resp.EnsureSuccessStatusCode();
                 using (var content = resp.Content)
                 {
-                    json = await content.ReadAsStringAsync();
+                    json = await content.ReadAsStringAsync().ConfigureAwait(false);
                 }
             }
 
@@ -223,7 +236,7 @@ namespace UnitTests
 
             try
             {
-                await task();
+                await task().ConfigureAwait(false);
                 successful = true;
             }
             catch (Exception e)
